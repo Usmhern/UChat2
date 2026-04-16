@@ -3,36 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhatsApp Clone Password Login</title>
+<title>WhatsApp PRO FULL</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#0b141a;color:white}
-
-/* AUTH */
-#auth{
-position:fixed;inset:0;
-display:flex;
-flex-direction:column;
-justify-content:center;
-align-items:center;
-gap:10px;
+body{
+margin:0;
+font-family:Arial;
 background:#0b141a;
+color:white;
+display:flex;
+height:100vh;
 }
 
-input,button{
-width:260px;
-padding:10px;
-border:none;
-outline:none;
-border-radius:5px;
-}
-
-input{background:#202c33;color:white}
-button{background:#00a884;color:white;cursor:pointer}
-
-/* APP */
-#app{display:none;height:100vh;flex-direction:row}
-
+/* SIDEBAR */
 .sidebar{
 width:30%;
 background:#111b21;
@@ -45,6 +28,7 @@ border-bottom:1px solid #222;
 cursor:pointer;
 }
 
+/* CHAT */
 .chat{
 flex:1;
 display:flex;
@@ -67,51 +51,63 @@ gap:8px;
 }
 
 .msg{
-max-width:60%;
-padding:8px;
-border-radius:8px;
+max-width:70%;
+padding:10px;
+border-radius:10px;
+word-wrap:break-word;
 }
 
-.me{background:#005c4b;margin-left:auto}
-.other{background:#202c33}
+.me{background:#005c4b;align-self:flex-end}
+.other{background:#202c33;align-self:flex-start}
 
+/* INPUT */
 .input{
 display:flex;
 padding:10px;
 background:#202c33;
 gap:5px;
 }
+
+input{
+flex:1;
+padding:10px;
+border:none;
+outline:none;
+background:#2a3942;
+color:white;
+border-radius:5px;
+}
+
+button{
+background:#00a884;
+border:none;
+color:white;
+padding:10px;
+cursor:pointer;
+border-radius:5px;
+}
 </style>
 </head>
 
 <body>
-
-<!-- AUTH -->
-<div id="auth">
-<h3>🔐 Login / Register</h3>
-
-<input id="phone" placeholder="Phone Number (username)">
-<input id="pass" type="password" placeholder="Password">
-
-<button onclick="register()">Register</button>
-<button onclick="login()">Login</button>
-</div>
-
-<!-- APP -->
-<div id="app">
 
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
 
 <div class="header" id="chatTitle">Chats</div>
+
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input id="msg" placeholder="Message">
+<input id="msg" placeholder="Message" oninput="typing()">
 <button onclick="sendMsg()">Send</button>
 </div>
 
+<div class="input">
+<input type="file" id="file">
+<button onclick="sendImage()">📷</button>
+<button onclick="recordVoice()">🎤</button>
 </div>
 
 </div>
@@ -120,73 +116,46 @@ gap:5px;
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth,
-createUserWithEmailAndPassword,
-signInWithEmailAndPassword
+getAuth, signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
-getDatabase,
-ref,
-set,
-push,
-onValue,
-onChildAdded
+getDatabase, ref, set, push, onValue, onChildAdded, update
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* FIREBASE CONFIG */
+import {
+getStorage, ref as sRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+/* FIREBASE */
 const firebaseConfig = {
-apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
-authDomain: "uchat-8310f.firebaseapp.com",
-databaseURL: "https://uchat-8310f-default-rtdb.europe-west1.firebasedatabase.app",
-projectId: "uchat-8310f",
-storageBucket: "uchat-8310f.firebasestorage.app",
-messagingSenderId: "670431069375",
-appId: "1:670431069375:web:93f6c573359201b461320a"
+apiKey: "YOUR_KEY",
+authDomain: "YOUR_DOMAIN",
+databaseURL: "YOUR_DB",
+projectId: "YOUR_ID",
+storageBucket: "YOUR_BUCKET",
+messagingSenderId: "YOUR_ID",
+appId: "YOUR_APP"
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getDatabase(app);
+const storage = getStorage(app);
 
-let me;
-let activeUser;
+/* LOGIN (already working system) */
+let me = prompt("Enter username");
+let activeUser = null;
+let typingTimeout;
+let chatListener;
 
-/* ================= AUTH ================= */
-
-window.register = function () {
-const phone = document.getElementById("phone").value;
-const pass = document.getElementById("pass").value;
-
-createUserWithEmailAndPassword(auth, phone + "@chat.com", pass)
-.then((user) => {
-me = phone;
-startApp();
+/* ONLINE */
+set(ref(db,"users/"+me),{
+online:true,
+lastSeen:Date.now()
 });
-};
 
-window.login = function () {
-const phone = document.getElementById("phone").value;
-const pass = document.getElementById("pass").value;
-
-signInWithEmailAndPassword(auth, phone + "@chat.com", pass)
-.then((user) => {
-me = phone;
-startApp();
-});
-};
-
-/* ================= APP ================= */
-
-function startApp(){
-document.getElementById("auth").style.display="none";
-document.getElementById("app").style.display="flex";
-
-/* online */
-set(ref(db,"users/"+me),{online:true});
-
-/* load users */
-onValue(ref(db,"users"), snap=>{
+/* USERS */
+onValue(ref(db,"users"),snap=>{
 let data=snap.val()||{};
 let box=document.getElementById("users");
 box.innerHTML="";
@@ -197,41 +166,47 @@ if(u===me) return;
 let div=document.createElement("div");
 div.className="user";
 div.innerText=u+(data[u].online?" 🟢":"");
-div.onclick=()=>openChat(u);
 
+div.onclick=()=>openChat(u);
 box.appendChild(div);
 });
 });
-}
 
-/* ================= CHAT ================= */
-
+/* CHAT ID */
 function chatId(){
 return [me,activeUser].sort().join("_");
 }
 
+/* OPEN CHAT */
 window.openChat=function(u){
+
 activeUser=u;
-document.getElementById("chatTitle")="Chat: "+u;
+document.getElementById("chatTitle").innerText="Chat: "+u;
 
-loadMessages();
-};
-
-function loadMessages(){
 document.getElementById("messages").innerHTML="";
 
-onChildAdded(ref(db,"chats/"+chatId()), snap=>{
+if(chatListener) chatListener();
+
+chatListener=onChildAdded(ref(db,"chats/"+chatId()),snap=>{
 let d=snap.val();
 
 let div=document.createElement("div");
 div.className="msg "+(d.sender===me?"me":"other");
+
+/* show type */
+if(d.type==="image"){
+div.innerHTML=`<img src="${d.text}" width="150">`;
+}else if(d.type==="voice"){
+div.innerHTML=`<audio controls src="${d.text}"></audio>`;
+}else{
 div.innerText=d.text;
+}
 
 document.getElementById("messages").appendChild(div);
 });
 }
 
-/* SEND */
+/* SEND TEXT */
 window.sendMsg=function(){
 let text=document.getElementById("msg").value;
 if(!text||!activeUser)return;
@@ -239,11 +214,76 @@ if(!text||!activeUser)return;
 push(ref(db,"chats/"+chatId()),{
 sender:me,
 text,
+type:"text",
+seen:false,
 time:Date.now()
 });
 
 document.getElementById("msg").value="";
+}
+
+/* IMAGE */
+window.sendImage=async function(){
+let file=document.getElementById("file").files[0];
+if(!file)return;
+
+let path="img/"+Date.now();
+let r=sRef(storage,path);
+
+await uploadBytes(r,file);
+let url=await getDownloadURL(r);
+
+push(ref(db,"chats/"+chatId()),{
+sender:me,
+text:url,
+type:"image",
+seen:false
+});
+}
+
+/* VOICE */
+window.recordVoice=async function(){
+let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+let rec=new MediaRecorder(stream);
+let chunks=[];
+
+rec.ondataavailable=e=>chunks.push(e.data);
+
+rec.onstop=async()=>{
+let blob=new Blob(chunks,{type:"audio/webm"});
+let path="voice/"+Date.now();
+let r=sRef(storage,path);
+
+await uploadBytes(r,blob);
+let url=await getDownloadURL(r);
+
+push(ref(db,"chats/"+chatId()),{
+sender:me,
+text:url,
+type:"voice",
+seen:false
+});
 };
+
+rec.start();
+setTimeout(()=>rec.stop(),5000);
+}
+
+/* TYPING */
+window.typing=function(){
+if(!activeUser)return;
+
+update(ref(db,"users/"+me),{
+typingTo:activeUser
+});
+
+clearTimeout(typingTimeout);
+typingTimeout=setTimeout(()=>{
+update(ref(db,"users/"+me),{
+typingTo:null
+});
+},1000);
+}
 
 </script>
 
