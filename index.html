@@ -1,326 +1,196 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UChat Pro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UChat Live</title>
 
 <style>
 body{
-margin:0;
-font-family:system-ui;
-background:#111;
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
 }
 
-/* LOGIN */
-#login{
-height:100vh;
-display:flex;
-flex-direction:column;
-justify-content:center;
-align-items:center;
-gap:10px;
-background:#111;
-color:#fff;
-}
-
-input{
-padding:12px;
-border-radius:25px;
-border:none;
-width:250px;
-outline:none;
-}
-
-button{
-padding:12px;
-border:none;
-border-radius:25px;
-background:#25D366;
-color:#fff;
-width:250px;
-}
-
-/* APP */
-#app{
-display:none;
-height:100vh;
-display:flex;
-}
-
-/* SIDEBAR */
-.sidebar{
-width:35%;
-background:#111;
-color:#fff;
-border-right:1px solid #222;
-overflow:auto;
-}
-
-.user{
-padding:12px;
-display:flex;
-align-items:center;
-gap:10px;
-border-bottom:1px solid #222;
-cursor:pointer;
-}
-
-.user img{
-width:45px;height:45px;border-radius:50%;
-}
-
-.online-dot{
-width:10px;height:10px;border-radius:50%;
-background:#25D366;
-margin-left:auto;
-}
-
-.offline-dot{
-width:10px;height:10px;border-radius:50%;
-background:red;
-margin-left:auto;
-}
-
-/* CHAT */
-.chat{
-flex:1;
-display:flex;
-flex-direction:column;
+.app{
+  width:360px;
+  height:600px;
+  background:#111827;
+  border-radius:15px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
 }
 
 header{
-background:#075E54;
-color:#fff;
-padding:10px;
-display:flex;
-align-items:center;
-gap:10px;
+  background:#2563eb;
+  padding:15px;
+  text-align:center;
+  font-weight:bold;
 }
 
-.messages{
-flex:1;
-padding:10px;
-background:#ece5dd;
-overflow:auto;
+.inputs{
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+
+input{
+  padding:10px;
+  border:none;
+  outline:none;
+  border-radius:8px;
+}
+
+#chat{
+  flex:1;
+  padding:10px;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 
 .msg{
-padding:8px;
-border-radius:10px;
-margin:5px;
-max-width:70%;
+  padding:10px;
+  border-radius:10px;
+  max-width:75%;
+  word-wrap:break-word;
 }
 
 .me{
-background:#dcf8c6;
-margin-left:auto;
+  background:#22c55e;
+  align-self:flex-end;
 }
 
-.them{
-background:#fff;
+.other{
+  background:#374151;
+  align-self:flex-start;
 }
 
-/* INPUT */
-.footer{
-display:flex;
-padding:10px;
-gap:5px;
-background:#fff;
+.sendBox{
+  display:flex;
+  border-top:1px solid #222;
 }
 
-.footer input{
-flex:1;
-border-radius:20px;
-border:1px solid #ccc;
+.sendBox input{
+  flex:1;
+  border-radius:0;
 }
 
-.send{
-background:#075E54;
-color:#fff;
-border:none;
-border-radius:50%;
-width:45px;height:45px;
+button{
+  padding:10px;
+  background:#2563eb;
+  border:none;
+  color:white;
+  cursor:pointer;
 }
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div id="login">
-<h2>UChat</h2>
-<input id="phone" placeholder="Phone number">
-<input id="name" placeholder="Your name">
-<input type="file" id="photo">
-<button onclick="register()">Register</button>
+<div class="app">
+
+<header>📱 UChat Live</header>
+
+<div class="inputs">
+  <input id="me" placeholder="Your phone number">
+  <input id="to" placeholder="Send to number">
 </div>
 
-<!-- APP -->
-<div id="app">
+<div id="chat"></div>
 
-<!-- USERS -->
-<div class="sidebar" id="users"></div>
-
-<!-- CHAT -->
-<div class="chat">
-
-<header id="chatHeader">Select a chat</header>
-
-<div class="messages" id="messages"></div>
-
-<div class="footer">
-<input id="msg" placeholder="Message">
-<button class="send" onclick="send()">➤</button>
+<div class="sendBox">
+  <input id="msg" placeholder="Type message...">
+  <button onclick="sendMsg()">Send</button>
 </div>
 
 </div>
 
-</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
-<script>
+// 🔥 YOUR FIREBASE CONFIG (FIXED & INTEGRATED)
 const firebaseConfig = {
-  apiKey: "AIzaSyC92Yqng7OXblKO7WHwrnW9obXj4qiq1eo",
-  authDomain: "toonz-70b08.firebaseapp.com",
-  projectId: "toonz-70b08",
-  storageBucket: "toonz-70b08.appspot.com",
-  messagingSenderId: "1007180452941",
-  appId: "1:1007180452941:web:195aa7a4e458550425b804"
+  apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
+  authDomain: "uchat-8310f.firebaseapp.com",
+  databaseURL: "https://uchat-8310f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "uchat-8310f",
+  storageBucket: "uchat-8310f.firebasestorage.app",
+  messagingSenderId: "670431069375",
+  appId: "1:670431069375:web:93f6c573359201b461320a",
+  measurementId: "G-8ZPW9BBW3W"
 };
 
-firebase.initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+getAnalytics(app);
+const db = getDatabase(app);
 
-const db = firebase.firestore();
-const storage = firebase.storage();
+window.sendMsg = function(){
 
-let me=null;
-let active=null;
+  const me = document.getElementById("me").value;
+  const to = document.getElementById("to").value;
+  const msg = document.getElementById("msg").value;
 
-/* REGISTER */
-async function register(){
+  if(!me || !to || !msg){
+    alert("Fill all fields");
+    return;
+  }
 
-const phone=document.getElementById("phone").value.trim();
-const name=document.getElementById("name").value.trim();
-const file=document.getElementById("photo").files[0];
+  const chatId = [me,to].sort().join("_");
 
-if(!phone||!name){
-alert("Enter phone and name");
-return;
+  push(ref(db, "chats/" + chatId), {
+    sender: me,
+    text: msg,
+    time: Date.now()
+  });
+
+  document.getElementById("msg").value = "";
 }
 
-try{
+// LIVE LISTENER
+let currentChat = "";
 
-let url="";
-
-if(file){
-const ref=storage.ref("profiles/"+phone);
-await ref.put(file);
-url=await ref.getDownloadURL();
-}
-
-await db.collection("users").doc(phone).set({
-name,phone,photo:url,lastSeen:Date.now()
-});
-
-me=phone;
-
-document.getElementById("login").style.display="none";
-document.getElementById("app").style.display="flex";
-
-loadUsers();
-startPresence();
-
-}catch(e){
-alert(e.message);
-}
-}
-
-/* USERS */
-function loadUsers(){
-
-db.collection("users").onSnapshot(snap=>{
-
-let html="";
-
-snap.forEach(doc=>{
-const u=doc.data();
-if(u.phone===me) return;
-
-const online=(Date.now()-u.lastSeen)<5000;
-
-html+=`
-<div class="user" onclick="openChat('${u.phone}','${u.name}')">
-<img src="${u.photo||''}">
-<div>${u.name}</div>
-<div class="${online?'online-dot':'offline-dot'}"></div>
-</div>`;
-});
-
-document.getElementById("users").innerHTML=html;
-});
-}
-
-/* OPEN CHAT */
-function openChat(id,name){
-
-active=id;
-document.getElementById("chatHeader").innerText=name;
-
-db.collection("chats")
-.orderBy("time")
-.onSnapshot(snap=>{
-
-let html="";
-
-snap.forEach(doc=>{
-const m=doc.data();
-
-if(
-(m.from===me&&m.to===active)||
-(m.from===active&&m.to===me)
-){
-html+=`
-<div class="msg ${m.from===me?'me':'them'}">
-${m.text}
-</div>`;
-}
-});
-
-document.getElementById("messages").innerHTML=html;
-});
-}
-
-/* SEND */
-function send(){
-
-const text=document.getElementById("msg").value;
-
-if(!text||!active) return;
-
-db.collection("chats").add({
-from:me,
-to:active,
-text,
-time:Date.now()
-});
-
-document.getElementById("msg").value="";
-}
-
-/* PRESENCE */
-function startPresence(){
 setInterval(()=>{
-if(me){
-db.collection("users").doc(me).update({
-lastSeen:Date.now()
-});
-}
-},2000);
-}
+
+  const me = document.getElementById("me").value;
+  const to = document.getElementById("to").value;
+
+  if(!me || !to) return;
+
+  const chatId = [me,to].sort().join("_");
+
+  if(chatId !== currentChat){
+
+    currentChat = chatId;
+    document.getElementById("chat").innerHTML = "";
+
+    onChildAdded(ref(db, "chats/" + chatId), (data)=>{
+
+      const d = data.val();
+
+      const div = document.createElement("div");
+      div.className = "msg " + (d.sender === me ? "me" : "other");
+      div.textContent = d.text;
+
+      document.getElementById("chat").appendChild(div);
+
+      document.getElementById("chat").scrollTop =
+        document.getElementById("chat").scrollHeight;
+    });
+  }
+
+},1000);
+
 </script>
 
 </body>
