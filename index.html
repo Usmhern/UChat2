@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhatsApp</title>
+<title>WhatsApp Clone Password Login</title>
 
 <style>
 body{margin:0;font-family:Arial;background:#0b141a;color:white}
@@ -81,8 +81,6 @@ padding:10px;
 background:#202c33;
 gap:5px;
 }
-
-.hidden{display:none}
 </style>
 </head>
 
@@ -90,23 +88,22 @@ gap:5px;
 
 <!-- AUTH -->
 <div id="auth">
-<h3>📱 UChat Login</h3>
+<h3>🔐 Login / Register</h3>
 
-<input id="phone" placeholder="+234XXXXXXXXXX">
+<input id="phone" placeholder="Phone Number (username)">
+<input id="pass" type="password" placeholder="Password">
 
-<div id="recaptcha"></div>
-
-<button onclick="sendOTP()">Send OTP</button>
-
-<input id="otp" placeholder="Enter OTP">
-<button onclick="verifyOTP()">Verify OTP</button>
+<button onclick="register()">Register</button>
+<button onclick="login()">Login</button>
 </div>
 
 <!-- APP -->
 <div id="app">
+
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
+
 <div class="header" id="chatTitle">Chats</div>
 <div class="messages" id="messages"></div>
 
@@ -114,7 +111,9 @@ gap:5px;
 <input id="msg" placeholder="Message">
 <button onclick="sendMsg()">Send</button>
 </div>
+
 </div>
+
 </div>
 
 <script type="module">
@@ -122,8 +121,8 @@ gap:5px;
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
 getAuth,
-RecaptchaVerifier,
-signInWithPhoneNumber
+createUserWithEmailAndPassword,
+signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
@@ -135,7 +134,7 @@ onValue,
 onChildAdded
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-/* 🔥 YOUR FIREBASE CONFIG */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
 apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
 authDomain: "uchat-8310f.firebaseapp.com",
@@ -152,77 +151,53 @@ const db = getDatabase(app);
 
 let me;
 let activeUser;
-let confirmationResult;
 
-/* 🔐 FIXED CAPTCHA INIT */
-window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha", {
-size: "invisible"
-});
+/* ================= AUTH ================= */
 
-window.recaptchaVerifier.render();
-
-/* ================= OTP ================= */
-
-/* SEND OTP */
-window.sendOTP = function () {
+window.register = function () {
 const phone = document.getElementById("phone").value;
+const pass = document.getElementById("pass").value;
 
-if (!phone.startsWith("+")) {
-alert("Use format +234XXXXXXXXXX");
-return;
-}
-
-signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
-.then((result) => {
-confirmationResult = result;
-alert("OTP Sent Successfully");
-})
-.catch((error) => {
-console.log(error);
-alert("OTP Failed: " + error.message);
+createUserWithEmailAndPassword(auth, phone + "@chat.com", pass)
+.then((user) => {
+me = phone;
+startApp();
 });
 };
 
-/* VERIFY OTP */
-window.verifyOTP = function () {
-const code = document.getElementById("otp").value;
+window.login = function () {
+const phone = document.getElementById("phone").value;
+const pass = document.getElementById("pass").value;
 
-confirmationResult.confirm(code)
-.then((result) => {
-me = result.user.phoneNumber;
-
+signInWithEmailAndPassword(auth, phone + "@chat.com", pass)
+.then((user) => {
+me = phone;
 startApp();
-})
-.catch((error) => {
-alert("Wrong OTP");
-console.log(error);
 });
 };
 
 /* ================= APP ================= */
 
-function startApp() {
-document.getElementById("auth").style.display = "none";
-document.getElementById("app").style.display = "flex";
+function startApp(){
+document.getElementById("auth").style.display="none";
+document.getElementById("app").style.display="flex";
 
-/* set user online */
-set(ref(db, "users/" + me), {
-online: true
-});
+/* online */
+set(ref(db,"users/"+me),{online:true});
 
 /* load users */
-onValue(ref(db, "users"), (snap) => {
-const data = snap.val() || {};
-const box = document.getElementById("users");
-box.innerHTML = "";
+onValue(ref(db,"users"), snap=>{
+let data=snap.val()||{};
+let box=document.getElementById("users");
+box.innerHTML="";
 
-Object.keys(data).forEach((u) => {
-if (u === me) return;
+Object.keys(data).forEach(u=>{
+if(u===me) return;
 
-const div = document.createElement("div");
-div.className = "user";
-div.innerText = u + (data[u].online ? " 🟢" : "");
-div.onclick = () => openChat(u);
+let div=document.createElement("div");
+div.className="user";
+div.innerText=u+(data[u].online?" 🟢":"");
+div.onclick=()=>openChat(u);
 
 box.appendChild(div);
 });
@@ -231,43 +206,43 @@ box.appendChild(div);
 
 /* ================= CHAT ================= */
 
-function chatId() {
-return [me, activeUser].sort().join("_");
+function chatId(){
+return [me,activeUser].sort().join("_");
 }
 
-window.openChat = function (u) {
-activeUser = u;
-document.getElementById("chatTitle").innerText = u;
+window.openChat=function(u){
+activeUser=u;
+document.getElementById("chatTitle")="Chat: "+u;
 
 loadMessages();
 };
 
-function loadMessages() {
-document.getElementById("messages").innerHTML = "";
+function loadMessages(){
+document.getElementById("messages").innerHTML="";
 
-onChildAdded(ref(db, "chats/" + chatId()), (snap) => {
-const d = snap.val();
+onChildAdded(ref(db,"chats/"+chatId()), snap=>{
+let d=snap.val();
 
-const div = document.createElement("div");
-div.className = "msg " + (d.sender === me ? "me" : "other");
-div.innerText = d.text;
+let div=document.createElement("div");
+div.className="msg "+(d.sender===me?"me":"other");
+div.innerText=d.text;
 
 document.getElementById("messages").appendChild(div);
 });
 }
 
-/* SEND MESSAGE */
-window.sendMsg = function () {
-const text = document.getElementById("msg").value;
-if (!text || !activeUser) return;
+/* SEND */
+window.sendMsg=function(){
+let text=document.getElementById("msg").value;
+if(!text||!activeUser)return;
 
-push(ref(db, "chats/" + chatId()), {
-sender: me,
+push(ref(db,"chats/"+chatId()),{
+sender:me,
 text,
-time: Date.now()
+time:Date.now()
 });
 
-document.getElementById("msg").value = "";
+document.getElementById("msg").value="";
 };
 
 </script>
