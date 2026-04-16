@@ -5,72 +5,103 @@
 <title>UChat Pro</title>
 
 <style>
-body{margin:0;font-family:sans-serif;background:#111;color:#fff}
+body{
+margin:0;
+font-family:system-ui;
+background:#111;
+}
 
 /* LOGIN */
 #login{
+height:100vh;
 display:flex;
 flex-direction:column;
 justify-content:center;
 align-items:center;
-height:100vh;
 gap:10px;
+background:#111;
+color:#fff;
 }
 
 input{
 padding:12px;
-border-radius:8px;
+border-radius:25px;
 border:none;
-width:220px;
+width:250px;
+outline:none;
 }
 
 button{
 padding:12px;
 border:none;
-border-radius:8px;
+border-radius:25px;
 background:#25D366;
 color:#fff;
-cursor:pointer;
+width:250px;
 }
 
 /* APP */
-#app{display:none;height:100vh;flex-direction:column}
-
-header{
-background:#075E54;
-padding:10px;
+#app{
+display:none;
+height:100vh;
 display:flex;
-align-items:center;
-gap:10px;
 }
 
-#users{
-flex:1;
-overflow:auto;
+/* SIDEBAR */
+.sidebar{
+width:35%;
 background:#111;
+color:#fff;
+border-right:1px solid #222;
+overflow:auto;
 }
 
 .user{
-padding:10px;
-border-bottom:1px solid #222;
+padding:12px;
 display:flex;
 align-items:center;
 gap:10px;
+border-bottom:1px solid #222;
 cursor:pointer;
 }
 
 .user img{
-width:35px;height:35px;border-radius:50%;
+width:45px;height:45px;border-radius:50%;
 }
 
-.online{color:#25D366}
-.offline{color:#aaa}
+.online-dot{
+width:10px;height:10px;border-radius:50%;
+background:#25D366;
+margin-left:auto;
+}
 
+.offline-dot{
+width:10px;height:10px;border-radius:50%;
+background:red;
+margin-left:auto;
+}
+
+/* CHAT */
 .chat{
 flex:1;
-overflow:auto;
+display:flex;
+flex-direction:column;
+}
+
+header{
+background:#075E54;
+color:#fff;
+padding:10px;
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.messages{
+flex:1;
 padding:10px;
 background:#ece5dd;
+overflow:auto;
 }
 
 .msg{
@@ -80,9 +111,16 @@ margin:5px;
 max-width:70%;
 }
 
-.me{background:#dcf8c6;margin-left:auto}
-.them{background:#fff;color:#000}
+.me{
+background:#dcf8c6;
+margin-left:auto;
+}
 
+.them{
+background:#fff;
+}
+
+/* INPUT */
 .footer{
 display:flex;
 padding:10px;
@@ -90,7 +128,19 @@ gap:5px;
 background:#fff;
 }
 
-.footer input{flex:1}
+.footer input{
+flex:1;
+border-radius:20px;
+border:1px solid #ccc;
+}
+
+.send{
+background:#075E54;
+color:#fff;
+border:none;
+border-radius:50%;
+width:45px;height:45px;
+}
 </style>
 </head>
 
@@ -108,17 +158,21 @@ background:#fff;
 <!-- APP -->
 <div id="app">
 
-<header>
-<h3 id="chatName">Chats</h3>
-</header>
+<!-- USERS -->
+<div class="sidebar" id="users"></div>
 
-<div id="users"></div>
+<!-- CHAT -->
+<div class="chat">
 
-<div class="chat" id="chat"></div>
+<header id="chatHeader">Select a chat</header>
+
+<div class="messages" id="messages"></div>
 
 <div class="footer">
-<input id="msg" placeholder="Message...">
-<button onclick="send()">➤</button>
+<input id="msg" placeholder="Message">
+<button class="send" onclick="send()">➤</button>
+</div>
+
 </div>
 
 </div>
@@ -146,7 +200,7 @@ const storage = firebase.storage();
 let me=null;
 let active=null;
 
-/* REGISTER (FIXED) */
+/* REGISTER */
 async function register(){
 
 const phone=document.getElementById("phone").value.trim();
@@ -162,25 +216,18 @@ try{
 
 let url="";
 
-/* SAFE IMAGE */
 if(file){
-try{
 const ref=storage.ref("profiles/"+phone);
 await ref.put(file);
 url=await ref.getDownloadURL();
-}catch(e){
-console.log("Image error",e);
-}
 }
 
-/* SAVE USER */
 await db.collection("users").doc(phone).set({
 name,phone,photo:url,lastSeen:Date.now()
 });
 
 me=phone;
 
-/* SHOW APP */
 document.getElementById("login").style.display="none";
 document.getElementById("app").style.display="flex";
 
@@ -188,7 +235,7 @@ loadUsers();
 startPresence();
 
 }catch(e){
-alert("Error: "+e.message);
+alert(e.message);
 }
 }
 
@@ -201,7 +248,6 @@ let html="";
 
 snap.forEach(doc=>{
 const u=doc.data();
-
 if(u.phone===me) return;
 
 const online=(Date.now()-u.lastSeen)<5000;
@@ -209,12 +255,8 @@ const online=(Date.now()-u.lastSeen)<5000;
 html+=`
 <div class="user" onclick="openChat('${u.phone}','${u.name}')">
 <img src="${u.photo||''}">
-<div>
 <div>${u.name}</div>
-<div class="${online?'online':'offline'}">
-${online?'online':'offline'}
-</div>
-</div>
+<div class="${online?'online-dot':'offline-dot'}"></div>
 </div>`;
 });
 
@@ -226,7 +268,7 @@ document.getElementById("users").innerHTML=html;
 function openChat(id,name){
 
 active=id;
-document.getElementById("chatName").innerText=name;
+document.getElementById("chatHeader").innerText=name;
 
 db.collection("chats")
 .orderBy("time")
@@ -248,7 +290,7 @@ ${m.text}
 }
 });
 
-document.getElementById("chat").innerHTML=html;
+document.getElementById("messages").innerHTML=html;
 });
 }
 
@@ -269,7 +311,7 @@ time:Date.now()
 document.getElementById("msg").value="";
 }
 
-/* PRESENCE (LIVE STATUS) */
+/* PRESENCE */
 function startPresence(){
 setInterval(()=>{
 if(me){
