@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UChat Pro</title>
+
+<style>
+body{margin:0;font-family:sans-serif;background:#111;color:#fff}
+
+/* LOGIN */
+#login{
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+height:100vh;
+gap:10px;
+}
+
+input{
+padding:12px;
+border-radius:8px;
+border:none;
+width:220px;
+}
+
+button{
+padding:12px;
+border:none;
+border-radius:8px;
+background:#25D366;
+color:#fff;
+}
+
+/* APP */
+#app{display:none;height:100vh;flex-direction:column}
+
+header{
+background:#075E54;
+padding:10px;
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+#users{
+flex:1;
+overflow:auto;
+background:#111;
+}
+
+.user{
+padding:10px;
+border-bottom:1px solid #222;
+display:flex;
+align-items:center;
+gap:10px;
+cursor:pointer;
+}
+
+.user img{
+width:35px;height:35px;border-radius:50%;
+}
+
+.online{color:#25D366}
+
+.chat{
+flex:1;
+overflow:auto;
+padding:10px;
+background:#ece5dd;
+}
+
+.msg{
+padding:8px;
+border-radius:10px;
+margin:5px;
+max-width:70%;
+}
+
+.me{background:#dcf8c6;margin-left:auto}
+.them{background:#fff;color:#000}
+
+.footer{
+display:flex;
+padding:10px;
+gap:5px;
+background:#fff;
+}
+
+.footer input{flex:1}
+
+.status{
+height:80px;
+overflow-x:auto;
+display:flex;
+gap:10px;
+padding:10px;
+background:#000;
+}
+
+.status img{
+width:60px;height:60px;border-radius:50%;
+border:2px solid #25D366;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+<h2>UChat</h2>
+<input id="phone" placeholder="Phone number">
+<input id="name" placeholder="Your name">
+<input type="file" id="photo">
+<button onclick="register()">Register</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+<header>
+<h3 id="chatName">Chats</h3>
+</header>
+
+<div class="status" id="status"></div>
+
+<div id="users"></div>
+
+<div class="chat" id="chat"></div>
+
+<div class="footer">
+<input id="msg">
+<button onclick="send()">➤</button>
+</div>
+
+</div>
+
+<!-- FIREBASE CDN (IMPORTANT) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC92Yqng7OXblKO7WHwrnW9obXj4qiq1eo",
+  authDomain: "toonz-70b08.firebaseapp.com",
+  projectId: "toonz-70b08",
+  storageBucket: "toonz-70b08.appspot.com",
+  messagingSenderId: "1007180452941",
+  appId: "1:1007180452941:web:195aa7a4e458550425b804"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+let me = null;
+let active = null;
+
+/* REGISTER */
+async function register(){
+
+const phone = document.getElementById("phone").value;
+const name = document.getElementById("name").value;
+const file = document.getElementById("photo").files[0];
+
+if(!phone || !name) return alert("Fill all fields");
+
+let url = "";
+
+if(file){
+const ref = storage.ref("profiles/" + phone);
+await ref.put(file);
+url = await ref.getDownloadURL();
+}
+
+await db.collection("users").doc(phone).set({
+name, phone, photo:url, lastSeen:Date.now()
+});
+
+me = phone;
+
+document.getElementById("login").style.display="none";
+document.getElementById("app").style.display="flex";
+
+loadUsers();
+}
+
+/* USERS */
+function loadUsers(){
+
+db.collection("users").onSnapshot(snap=>{
+
+let html="";
+
+snap.forEach(doc=>{
+const u = doc.data();
+if(u.phone === me) return;
+
+const online = (Date.now() - u.lastSeen) < 5000;
+
+html += `
+<div class="user" onclick="openChat('${u.phone}','${u.name}')">
+<img src="${u.photo||''}">
+<div>
+<div>${u.name}</div>
+<div class="${online?'online':''}">
+${online?'online':'offline'}
+</div>
+</div>
+</div>`;
+});
+
+document.getElementById("users").innerHTML = html;
+});
+}
+
+/* OPEN CHAT */
+function openChat(id,name){
+active = id;
+document.getElementById("chatName").innerText = name;
+
+db.collection("chats")
+.orderBy("time")
+.onSnapshot(snap=>{
+
+let html="";
+
+snap.forEach(doc=>{
+const m = doc.data();
+
+if(
+(m.from===me && m.to===active) ||
+(m.from===active && m.to===me)
+){
+
+html += `
+<div class="msg ${m.from===me?'me':'them'}">
+${m.text}
+</div>`;
+}
+});
+
+document.getElementById("chat").innerHTML = html;
+});
+}
+
+/* SEND */
+function send(){
+
+const text = document.getElementById("msg").value;
+
+if(!text || !active) return;
+
+db.collection("chats").add({
+from:me,
+to:active,
+text,
+time:Date.now()
+});
+
+document.getElementById("msg").value="";
+}
+
+/* PRESENCE (REAL ONLINE STATUS) */
+setInterval(()=>{
+if(me){
+db.collection("users").doc(me).update({
+lastSeen:Date.now()
+});
+}
+},2000);
+</script>
+
+</body>
+</html>
