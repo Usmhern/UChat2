@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhatsApp Clone PRO</title>
+<title>WhatsApp</title>
 
 <style>
 body{margin:0;font-family:Arial;background:#0b141a;color:white}
@@ -11,43 +11,36 @@ body{margin:0;font-family:Arial;background:#0b141a;color:white}
 /* AUTH */
 #auth{
 position:fixed;inset:0;
-background:#0b141a;
 display:flex;
 flex-direction:column;
 justify-content:center;
 align-items:center;
 gap:10px;
+background:#0b141a;
 }
 
 input,button{
+width:260px;
 padding:10px;
-width:250px;
 border:none;
 outline:none;
+border-radius:5px;
 }
 
 input{background:#202c33;color:white}
 button{background:#00a884;color:white;cursor:pointer}
 
 /* APP */
-#app{display:none;height:100vh}
+#app{display:none;height:100vh;flex-direction:row}
 
-.tabs{
-display:flex;
-background:#202c33;
-justify-content:space-around;
-padding:10px;
+.sidebar{
+width:30%;
+background:#111b21;
+overflow:auto;
 }
 
-.tab{cursor:pointer}
-.active{border-bottom:2px solid #00a884}
-
-.container{display:flex;height:90vh}
-
-.sidebar{width:30%;background:#111b21;overflow:auto}
-
 .user{
-padding:10px;
+padding:12px;
 border-bottom:1px solid #222;
 cursor:pointer;
 }
@@ -56,6 +49,12 @@ cursor:pointer;
 flex:1;
 display:flex;
 flex-direction:column;
+}
+
+.header{
+background:#202c33;
+padding:12px;
+font-weight:bold;
 }
 
 .messages{
@@ -83,7 +82,7 @@ background:#202c33;
 gap:5px;
 }
 
-.small{font-size:11px;color:#00ff88}
+.hidden{display:none}
 </style>
 </head>
 
@@ -91,44 +90,30 @@ gap:5px;
 
 <!-- AUTH -->
 <div id="auth">
-<h3>📱 WhatsApp Clone Login</h3>
-<input id="phone" placeholder="+234xxxxxxxxxx">
+<h3>📱 UChat Login</h3>
+
+<input id="phone" placeholder="+234XXXXXXXXXX">
+
 <div id="recaptcha"></div>
+
 <button onclick="sendOTP()">Send OTP</button>
+
 <input id="otp" placeholder="Enter OTP">
-<button onclick="verifyOTP()">Verify</button>
+<button onclick="verifyOTP()">Verify OTP</button>
 </div>
 
 <!-- APP -->
 <div id="app">
-
-<div class="tabs">
-<div class="tab active">Chats</div>
-<div class="tab">Status</div>
-<div class="tab">Calls</div>
-</div>
-
-<div class="container">
-
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
-
+<div class="header" id="chatTitle">Chats</div>
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input id="msg" placeholder="Message" oninput="typing()">
+<input id="msg" placeholder="Message">
 <button onclick="sendMsg()">Send</button>
 </div>
-
-<div class="input">
-<input type="file" id="img">
-<button onclick="sendImage()">📷</button>
-<button onclick="recordVoice()">🎤</button>
-</div>
-
-</div>
-
 </div>
 </div>
 
@@ -136,164 +121,154 @@ gap:5px;
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth, RecaptchaVerifier, signInWithPhoneNumber
+getAuth,
+RecaptchaVerifier,
+signInWithPhoneNumber
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
-getDatabase, ref, set, push, onValue, onChildAdded, update
+getDatabase,
+ref,
+set,
+push,
+onValue,
+onChildAdded
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-import {
-getStorage, ref as sRef, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-
-/* FIREBASE CONFIG */
+/* 🔥 YOUR FIREBASE CONFIG */
 const firebaseConfig = {
-apiKey: "YOUR_KEY",
-authDomain: "YOUR_DOMAIN",
-databaseURL: "YOUR_DB",
-projectId: "YOUR_ID",
-storageBucket: "YOUR_BUCKET",
-messagingSenderId: "YOUR_ID",
-appId: "YOUR_APP"
+apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
+authDomain: "uchat-8310f.firebaseapp.com",
+databaseURL: "https://uchat-8310f-default-rtdb.europe-west1.firebasedatabase.app",
+projectId: "uchat-8310f",
+storageBucket: "uchat-8310f.firebasestorage.app",
+messagingSenderId: "670431069375",
+appId: "1:670431069375:web:93f6c573359201b461320a"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 let me;
 let activeUser;
+let confirmationResult;
 
-/* CAPTCHA */
-window.recaptchaVerifier = new RecaptchaVerifier(auth,'recaptcha',{size:'invisible'});
-
-/* OTP */
-window.sendOTP=function(){
-signInWithPhoneNumber(auth,document.getElementById("phone").value,window.recaptchaVerifier)
-.then(r=>window.confirmationResult=r);
-}
-
-window.verifyOTP=function(){
-window.confirmationResult.confirm(document.getElementById("otp").value)
-.then(res=>{
-me=res.user.phoneNumber;
-initApp();
+/* 🔐 FIXED CAPTCHA INIT */
+window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha", {
+size: "invisible"
 });
+
+window.recaptchaVerifier.render();
+
+/* ================= OTP ================= */
+
+/* SEND OTP */
+window.sendOTP = function () {
+const phone = document.getElementById("phone").value;
+
+if (!phone.startsWith("+")) {
+alert("Use format +234XXXXXXXXXX");
+return;
 }
 
-/* INIT */
-function initApp(){
-document.getElementById("auth").style.display="none";
-document.getElementById("app").style.display="block";
+signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
+.then((result) => {
+confirmationResult = result;
+alert("OTP Sent Successfully");
+})
+.catch((error) => {
+console.log(error);
+alert("OTP Failed: " + error.message);
+});
+};
 
-set(ref(db,"users/"+me),{online:true});
-}
+/* VERIFY OTP */
+window.verifyOTP = function () {
+const code = document.getElementById("otp").value;
 
-/* USERS */
-onValue(ref(db,"users"),snap=>{
-let data=snap.val()||{};
-let box=document.getElementById("users");
-box.innerHTML="";
+confirmationResult.confirm(code)
+.then((result) => {
+me = result.user.phoneNumber;
 
-Object.keys(data).forEach(u=>{
-if(u===me) return;
+startApp();
+})
+.catch((error) => {
+alert("Wrong OTP");
+console.log(error);
+});
+};
 
-let div=document.createElement("div");
-div.className="user";
-div.innerHTML=u+(data[u].online?" 🟢":"");
-div.onclick=()=>openChat(u);
+/* ================= APP ================= */
+
+function startApp() {
+document.getElementById("auth").style.display = "none";
+document.getElementById("app").style.display = "flex";
+
+/* set user online */
+set(ref(db, "users/" + me), {
+online: true
+});
+
+/* load users */
+onValue(ref(db, "users"), (snap) => {
+const data = snap.val() || {};
+const box = document.getElementById("users");
+box.innerHTML = "";
+
+Object.keys(data).forEach((u) => {
+if (u === me) return;
+
+const div = document.createElement("div");
+div.className = "user";
+div.innerText = u + (data[u].online ? " 🟢" : "");
+div.onclick = () => openChat(u);
+
 box.appendChild(div);
 });
 });
-
-/* CHAT ID */
-function chatId(){
-return [me,activeUser].sort().join("_");
 }
 
-/* OPEN CHAT */
-window.openChat=function(u){
-activeUser=u;
+/* ================= CHAT ================= */
+
+function chatId() {
+return [me, activeUser].sort().join("_");
+}
+
+window.openChat = function (u) {
+activeUser = u;
+document.getElementById("chatTitle").innerText = u;
+
 loadMessages();
-}
+};
 
-/* MESSAGES */
-function loadMessages(){
-document.getElementById("messages").innerHTML="";
+function loadMessages() {
+document.getElementById("messages").innerHTML = "";
 
-onChildAdded(ref(db,"chats/"+chatId()),snap=>{
-let d=snap.val();
+onChildAdded(ref(db, "chats/" + chatId()), (snap) => {
+const d = snap.val();
 
-let div=document.createElement("div");
-div.className="msg "+(d.sender===me?"me":"other");
-
-div.innerHTML=
-d.type==="image"
-? `<img src="${d.text}" width="150">`
-: d.type==="voice"
-? `<audio controls src="${d.text}"></audio>`
-: d.text;
+const div = document.createElement("div");
+div.className = "msg " + (d.sender === me ? "me" : "other");
+div.innerText = d.text;
 
 document.getElementById("messages").appendChild(div);
 });
 }
 
-/* SEND TEXT */
-window.sendMsg=function(){
-let text=document.getElementById("msg").value;
-push(ref(db,"chats/"+chatId()),{
-sender:me,
+/* SEND MESSAGE */
+window.sendMsg = function () {
+const text = document.getElementById("msg").value;
+if (!text || !activeUser) return;
+
+push(ref(db, "chats/" + chatId()), {
+sender: me,
 text,
-type:"text",
-time:Date.now()
+time: Date.now()
 });
-document.getElementById("msg").value="";
-}
 
-/* IMAGE */
-window.sendImage=async function(){
-let file=document.getElementById("img").files[0];
-let path="img/"+Date.now()+file.name;
-let r=sRef(storage,path);
-await uploadBytes(r,file);
-let url=await getDownloadURL(r);
-
-push(ref(db,"chats/"+chatId()),{
-sender:me,
-text:url,
-type:"image",
-time:Date.now()
-});
-}
-
-/* VOICE */
-window.recordVoice=async function(){
-let stream=await navigator.mediaDevices.getUserMedia({audio:true});
-let rec=new MediaRecorder(stream);
-let chunks=[];
-
-rec.ondataavailable=e=>chunks.push(e.data);
-
-rec.onstop=async()=>{
-let blob=new Blob(chunks,{type:"audio/webm"});
-let path="voice/"+Date.now();
-let r=sRef(storage,path);
-await uploadBytes(r,blob);
-let url=await getDownloadURL(r);
-
-push(ref(db,"chats/"+chatId()),{
-sender:me,
-text:url,
-type:"voice",
-time:Date.now()
-});
+document.getElementById("msg").value = "";
 };
-
-rec.start();
-setTimeout(()=>rec.stop(),5000);
-}
 
 </script>
 
