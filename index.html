@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WhatsApp PRO FULL</title>
+<title>WhatsApp FIXED PRO</title>
 
 <style>
 body{
@@ -11,11 +11,43 @@ margin:0;
 font-family:Arial;
 background:#0b141a;
 color:white;
+}
+
+/* LOGIN */
+#auth{
+position:fixed;
+inset:0;
 display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+gap:10px;
+background:#0b141a;
+}
+
+input,button{
+width:260px;
+padding:10px;
+border:none;
+outline:none;
+border-radius:6px;
+}
+
+input{background:#202c33;color:white}
+button{background:#00a884;color:white;cursor:pointer}
+
+/* APP */
+#app{
+display:none;
 height:100vh;
 }
 
-/* SIDEBAR */
+.container{
+display:flex;
+height:100%;
+}
+
+/* USERS */
 .sidebar{
 width:30%;
 background:#111b21;
@@ -27,6 +59,8 @@ padding:12px;
 border-bottom:1px solid #222;
 cursor:pointer;
 }
+
+.user:hover{background:#1f2c33}
 
 /* CHAT */
 .chat{
@@ -57,10 +91,16 @@ border-radius:10px;
 word-wrap:break-word;
 }
 
-.me{background:#005c4b;align-self:flex-end}
-.other{background:#202c33;align-self:flex-start}
+.me{
+background:#005c4b;
+align-self:flex-end;
+}
 
-/* INPUT */
+.other{
+background:#202c33;
+align-self:flex-start;
+}
+
 .input{
 display:flex;
 padding:10px;
@@ -68,64 +108,62 @@ background:#202c33;
 gap:5px;
 }
 
-input{
+.input input{
 flex:1;
-padding:10px;
-border:none;
-outline:none;
-background:#2a3942;
-color:white;
-border-radius:5px;
 }
 
-button{
-background:#00a884;
-border:none;
-color:white;
-padding:10px;
-cursor:pointer;
-border-radius:5px;
-}
 </style>
 </head>
 
 <body>
 
+<!-- LOGIN -->
+<div id="auth">
+<h3>🔐 Login</h3>
+<input id="user" placeholder="Enter username">
+<input id="pass" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+<div class="container">
+
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
 
-<div class="header" id="chatTitle">Chats</div>
+<div class="header" id="chatTitle">Select User</div>
 
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input id="msg" placeholder="Message" oninput="typing()">
+<input id="msg" placeholder="Message">
 <button onclick="sendMsg()">Send</button>
 </div>
 
-<div class="input">
-<input type="file" id="file">
-<button onclick="sendImage()">📷</button>
-<button onclick="recordVoice()">🎤</button>
 </div>
 
+</div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth, signInWithEmailAndPassword
+getAuth,
+signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
-getDatabase, ref, set, push, onValue, onChildAdded, update
+getDatabase,
+ref,
+set,
+push,
+onValue,
+onChildAdded,
+off
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-import {
-getStorage, ref as sRef, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 /* FIREBASE */
 const firebaseConfig = {
@@ -140,24 +178,49 @@ appId: "YOUR_APP"
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
-/* LOGIN (already working system) */
-let me = prompt("Enter username");
+let me = null;
 let activeUser = null;
-let typingTimeout;
-let chatListener;
+let chatRef = null;
 
-/* ONLINE */
+/* ================= LOGIN ================= */
+
+window.login = function () {
+const user = document.getElementById("user").value;
+const pass = document.getElementById("pass").value;
+
+/* fake email system (stable for chat apps) */
+signInWithEmailAndPassword(
+getAuth(app),
+user + "@chat.com",
+pass
+).then(() => {
+
+me = user;
+
+document.getElementById("auth").style.display = "none";
+document.getElementById("app").style.display = "block";
+
+/* set online */
 set(ref(db,"users/"+me),{
 online:true,
 lastSeen:Date.now()
 });
 
-/* USERS */
-onValue(ref(db,"users"),snap=>{
-let data=snap.val()||{};
-let box=document.getElementById("users");
+loadUsers();
+
+}).catch(err=>{
+alert("Login failed: " + err.message);
+});
+};
+
+/* ================= USERS ================= */
+
+function loadUsers(){
+onValue(ref(db,"users"), snap=>{
+const data = snap.val() || {};
+const box = document.getElementById("users");
+
 box.innerHTML="";
 
 Object.keys(data).forEach(u=>{
@@ -165,125 +228,65 @@ if(u===me) return;
 
 let div=document.createElement("div");
 div.className="user";
-div.innerText=u+(data[u].online?" 🟢":"");
+div.innerText=u + (data[u].online ? " 🟢" : "");
 
 div.onclick=()=>openChat(u);
+
 box.appendChild(div);
 });
 });
+}
 
-/* CHAT ID */
+/* ================= CHAT ================= */
+
 function chatId(){
-return [me,activeUser].sort().join("_");
+return [me, activeUser].sort().join("_");
 }
 
 /* OPEN CHAT */
-window.openChat=function(u){
+window.openChat = function (u) {
 
-activeUser=u;
-document.getElementById("chatTitle").innerText="Chat: "+u;
+activeUser = u;
 
-document.getElementById("messages").innerHTML="";
+document.getElementById("chatTitle").innerText = "Chat with " + u;
 
-if(chatListener) chatListener();
+document.getElementById("messages").innerHTML = "";
 
-chatListener=onChildAdded(ref(db,"chats/"+chatId()),snap=>{
-let d=snap.val();
+/* remove old listener */
+if(chatRef) off(chatRef);
 
-let div=document.createElement("div");
-div.className="msg "+(d.sender===me?"me":"other");
+chatRef = ref(db,"chats/"+chatId());
 
-/* show type */
-if(d.type==="image"){
-div.innerHTML=`<img src="${d.text}" width="150">`;
-}else if(d.type==="voice"){
-div.innerHTML=`<audio controls src="${d.text}"></audio>`;
-}else{
-div.innerText=d.text;
-}
+onChildAdded(chatRef,(snap)=>{
+const d = snap.val();
+
+let div = document.createElement("div");
+div.className = "msg " + (d.sender===me?"me":"other");
+div.innerText = d.text;
 
 document.getElementById("messages").appendChild(div);
-});
-}
 
-/* SEND TEXT */
-window.sendMsg=function(){
-let text=document.getElementById("msg").value;
-if(!text||!activeUser)return;
-
-push(ref(db,"chats/"+chatId()),{
-sender:me,
-text,
-type:"text",
-seen:false,
-time:Date.now()
+document.getElementById("messages").scrollTop =
+document.getElementById("messages").scrollHeight;
 });
 
-document.getElementById("msg").value="";
-}
-
-/* IMAGE */
-window.sendImage=async function(){
-let file=document.getElementById("file").files[0];
-if(!file)return;
-
-let path="img/"+Date.now();
-let r=sRef(storage,path);
-
-await uploadBytes(r,file);
-let url=await getDownloadURL(r);
-
-push(ref(db,"chats/"+chatId()),{
-sender:me,
-text:url,
-type:"image",
-seen:false
-});
-}
-
-/* VOICE */
-window.recordVoice=async function(){
-let stream=await navigator.mediaDevices.getUserMedia({audio:true});
-let rec=new MediaRecorder(stream);
-let chunks=[];
-
-rec.ondataavailable=e=>chunks.push(e.data);
-
-rec.onstop=async()=>{
-let blob=new Blob(chunks,{type:"audio/webm"});
-let path="voice/"+Date.now();
-let r=sRef(storage,path);
-
-await uploadBytes(r,blob);
-let url=await getDownloadURL(r);
-
-push(ref(db,"chats/"+chatId()),{
-sender:me,
-text:url,
-type:"voice",
-seen:false
-});
 };
 
-rec.start();
-setTimeout(()=>rec.stop(),5000);
-}
+/* ================= SEND ================= */
 
-/* TYPING */
-window.typing=function(){
-if(!activeUser)return;
+window.sendMsg = function () {
+const text = document.getElementById("msg").value;
 
-update(ref(db,"users/"+me),{
-typingTo:activeUser
+if(!text || !activeUser) return;
+
+push(ref(db,"chats/"+chatId()),{
+sender: me,
+text: text,
+time: Date.now()
 });
 
-clearTimeout(typingTimeout);
-typingTimeout=setTimeout(()=>{
-update(ref(db,"users/"+me),{
-typingTo:null
-});
-},1000);
-}
+document.getElementById("msg").value = "";
+};
 
 </script>
 
