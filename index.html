@@ -14,6 +14,7 @@
 --text:#e9edef;
 --sub:#8696a0;
 }
+
 *{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif;}
 body{background:var(--bg);color:var(--text);height:100vh}
 
@@ -68,7 +69,6 @@ border-radius:8px;max-width:70%;
 }
 .sent{align-self:flex-end;background:var(--green);color:black}
 .received{align-self:flex-start;background:var(--chat)}
-
 .meta{font-size:10px;margin-top:5px;text-align:right}
 
 /* INPUT */
@@ -94,7 +94,7 @@ color:white;border-radius:50%;cursor:pointer;
 <h2>UChat</h2>
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
-<button onclick="login()">Login / Register</button>
+<button onclick="handleLogin()">Login / Register</button>
 </div>
 
 <!-- APP -->
@@ -118,7 +118,7 @@ color:white;border-radius:50%;cursor:pointer;
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword
+getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
@@ -130,14 +130,14 @@ import {
 getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-/* FIREBASE CONFIG */
+/* FIREBASE */
 const firebaseConfig = {
-  apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
-  authDomain: "uchat-8310f.firebaseapp.com",
-  projectId: "uchat-8310f",
-  storageBucket: "uchat-8310f.firebasestorage.app",
-  messagingSenderId: "670431069375",
-  appId: "1:670431069375:web:93f6c573359201b461320a"
+apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
+authDomain: "uchat-8310f.firebaseapp.com",
+projectId: "uchat-8310f",
+storageBucket: "uchat-8310f.firebasestorage.app",
+messagingSenderId: "670431069375",
+appId: "1:670431069375:web:93f6c573359201b461320a"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -145,12 +145,23 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let me=null,currentChat=null;
+/* DOM */
+const loginDiv = document.getElementById("login");
+const appDiv = document.getElementById("app");
+const usersDiv = document.getElementById("users");
+const msg = document.getElementById("msg");
+const fileInput = document.getElementById("fileInput");
+const messages = document.getElementById("messages");
+const chatHeader = document.getElementById("chatHeader");
+const typing = document.getElementById("typing");
+
+let me = null;
+let currentChat = null;
 
 /* LOGIN */
-window.login = async ()=>{
-let emailVal = email.value.trim();
-let passVal = password.value.trim();
+window.handleLogin = async () => {
+let emailVal = document.getElementById("email").value.trim();
+let passVal = document.getElementById("password").value.trim();
 
 if(!emailVal || !passVal){
 alert("Enter email & password");
@@ -162,47 +173,45 @@ await signInWithEmailAndPassword(auth,emailVal,passVal);
 }catch{
 await createUserWithEmailAndPassword(auth,emailVal,passVal);
 }
+};
 
-me = auth.currentUser.email;
+/* AUTH STATE */
+onAuthStateChanged(auth, async (user)=>{
+if(user){
+me = user.email;
 
-/* SAVE USER */
 await setDoc(doc(db,"users",me),{
 email:me,
 online:true,
 lastSeen:Date.now()
 });
 
-login.style.display="none";
-app.style.display="block";
+loginDiv.style.display="none";
+appDiv.style.display="block";
 
 loadUsers();
-};
+}
+});
 
-/* LOAD USERS */
+/* USERS */
 function loadUsers(){
-onSnapshot(collection(db,"users"),snapshot=>{
-users.innerHTML="";
+onSnapshot(collection(db,"users"),snap=>{
+usersDiv.innerHTML="";
 
-snapshot.forEach(docSnap=>{
-let data = docSnap.data();
-if(data.email===me) return;
+snap.forEach(u=>{
+let d=u.data();
+if(d.email===me) return;
 
 let div=document.createElement("div");
 div.className="chat-item";
-
-div.innerHTML=`
-<b>${data.email}</b><br>
-<small>${data.online?"online":"offline"}</small>
-`;
-
-div.onclick=()=>openChat(data.email);
-
-users.appendChild(div);
+div.innerHTML=`<b>${d.email}</b><br><small>${d.online?"online":"offline"}</small>`;
+div.onclick=()=>openChat(d.email);
+usersDiv.appendChild(div);
 });
 });
 }
 
-/* OPEN CHAT */
+/* CHAT */
 function openChat(user){
 currentChat=user;
 chatHeader.innerText=user;
@@ -212,36 +221,26 @@ const q=query(collection(db,"messages"),orderBy("time"));
 onSnapshot(q,snap=>{
 messages.innerHTML="";
 
-snap.forEach(async docSnap=>{
-let m=docSnap.data();
+snap.forEach(async m=>{
+let data=m.data();
 
-if(
-(m.from===me && m.to===user) ||
-(m.from===user && m.to===me)
-){
+if((data.from===me && data.to===user)||(data.from===user && data.to===me)){
+
 let div=document.createElement("div");
-div.className="msg "+(m.from===me?"sent":"received");
+div.className="msg "+(data.from===me?"sent":"received");
 
-let content=m.text||"";
-
-if(m.image){
-content+=`<br><img src="${m.image}" width="150">`;
-}
-if(m.audio){
-content+=`<br><audio controls src="${m.audio}"></audio>`;
-}
+let content=data.text||"";
+if(data.image) content+=`<br><img src="${data.image}" width="150">`;
+if(data.audio) content+=`<br><audio controls src="${data.audio}"></audio>`;
 
 div.innerHTML=content+`
-<div class="meta">
-${new Date(m.time).toLocaleTimeString()}
-${m.from===me ? (m.seen?" ✔✔":" ✔"):""}
-</div>`;
+<div class="meta">${new Date(data.time).toLocaleTimeString()}</div>
+`;
 
 messages.appendChild(div);
 
-/* seen */
-if(m.to===me && !m.seen){
-await updateDoc(doc(db,"messages",docSnap.id),{seen:true});
+if(data.to===me && !data.seen){
+await updateDoc(doc(db,"messages",m.id),{seen:true});
 }
 }
 });
@@ -277,71 +276,6 @@ await addDoc(collection(db,"messages"),data);
 msg.value="";
 fileInput.value="";
 };
-
-/* VOICE */
-let recorder,chunks=[],recording=false;
-
-recordBtn.onclick = async ()=>{
-if(!currentChat) return;
-
-if(!recording){
-let stream = await navigator.mediaDevices.getUserMedia({audio:true});
-recorder = new MediaRecorder(stream);
-
-chunks=[];
-
-recorder.ondataavailable=e=>chunks.push(e.data);
-
-recorder.onstop=async ()=>{
-let blob=new Blob(chunks,{type:"audio/webm"});
-let r=ref(storage,"voice/"+Date.now());
-
-await uploadBytes(r,blob);
-let url=await getDownloadURL(r);
-
-await addDoc(collection(db,"messages"),{
-from:me,
-to:currentChat,
-audio:url,
-time:Date.now(),
-seen:false
-});
-};
-
-recorder.start();
-recordBtn.innerText="⏹";
-recording=true;
-
-}else{
-recorder.stop();
-recordBtn.innerText="🎤";
-recording=false;
-}
-};
-
-/* TYPING */
-msg.oninput=()=>{
-if(!currentChat) return;
-
-setDoc(doc(db,"typing",me),{
-to:currentChat,typing:true
-});
-
-setTimeout(()=>{
-setDoc(doc(db,"typing",me),{typing:false});
-},1000);
-};
-
-onSnapshot(collection(db,"typing"),snap=>{
-let txt="";
-snap.forEach(t=>{
-let d=t.data();
-if(t.id===currentChat && d.typing){
-txt="typing...";
-}
-});
-typing.innerText=txt;
-});
 </script>
 
 </body>
