@@ -3,10 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UChat Working</title>
+<title>UChat Final</title>
 
 <style>
-body{margin:0;font-family:sans-serif;background:#0b141a;color:white}
+:root{
+--bg:#0b141a;
+--panel:#111b21;
+--chat:#202c33;
+--green:#00a884;
+--text:#e9edef;
+--sub:#8696a0;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif;}
+body{background:var(--bg);color:var(--text);height:100vh}
 
 /* LOGIN */
 #login{
@@ -18,7 +27,8 @@ height:100vh;gap:10px;
 padding:12px;width:260px;border:none;border-radius:6px;
 }
 #login button{
-padding:12px;width:260px;background:#00a884;border:none;color:white;
+padding:12px;width:260px;background:var(--green);
+border:none;color:white;cursor:pointer;
 }
 
 /* APP */
@@ -26,36 +36,54 @@ padding:12px;width:260px;background:#00a884;border:none;color:white;
 
 /* SIDEBAR */
 .sidebar{
-width:30%;height:100%;float:left;
-background:#111b21;overflow:auto;
+width:30%;height:100%;
+background:var(--panel);
+float:left;overflow:auto;
+border-right:1px solid #1f2c33;
 }
 .chat-item{
-padding:12px;border-bottom:1px solid #222;cursor:pointer;
+padding:12px;border-bottom:1px solid #1f2c33;
+cursor:pointer;
 }
-.chat-item:hover{background:#202c33}
+.chat-item:hover{background:var(--chat)}
+.chat-item small{color:var(--sub)}
 
 /* CHAT */
 .chat{
-width:70%;float:left;height:100%;
+width:70%;height:100%;
+float:left;
 display:flex;flex-direction:column;
+}
+.header{
+padding:12px;background:var(--panel);
+border-bottom:1px solid #1f2c33;
 }
 .messages{
 flex:1;overflow:auto;padding:10px;
 display:flex;flex-direction:column;
 }
 .msg{
-padding:10px;margin:5px;border-radius:10px;max-width:70%;
+padding:10px;margin:5px;
+border-radius:8px;max-width:70%;
 }
-.sent{align-self:flex-end;background:#00a884;color:black}
-.received{align-self:flex-start;background:#202c33}
+.sent{align-self:flex-end;background:var(--green);color:black}
+.received{align-self:flex-start;background:var(--chat)}
 
+.meta{font-size:10px;margin-top:5px;text-align:right}
+
+/* INPUT */
 .input{
-display:flex;padding:10px;background:#202c33;
+display:flex;padding:10px;background:var(--panel);gap:5px
 }
-.input input{flex:1;padding:10px;border:none;border-radius:20px}
+.input input[type=text]{
+flex:1;padding:10px;border:none;border-radius:20px
+}
 .input button{
-margin-left:5px;padding:10px;border:none;background:#00a884;color:white;border-radius:50%;
+padding:10px;border:none;background:var(--green);
+color:white;border-radius:50%;cursor:pointer;
 }
+
+#typing{font-size:12px;color:var(--sub);padding-left:10px}
 </style>
 </head>
 
@@ -74,11 +102,13 @@ margin-left:5px;padding:10px;border:none;background:#00a884;color:white;border-r
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
-<div id="chatHeader" style="padding:10px">Select user</div>
+<div class="header" id="chatHeader">Select a user</div>
+<div id="typing"></div>
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input id="msg" placeholder="Message">
+<input type="text" id="msg" placeholder="Type a message">
+<input type="file" id="fileInput">
 <button onclick="send()">➤</button>
 <button id="recordBtn">🎤</button>
 </div>
@@ -88,18 +118,19 @@ margin-left:5px;padding:10px;border:none;background:#00a884;color:white;border-r
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged
+getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
-getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc
+getFirestore, collection, addDoc, onSnapshot, query, orderBy,
+doc, setDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 import {
 getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-/* 🔥 YOUR CONFIG */
+/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyCV99zLt-hvSrDVM0hJUPOL6TpxUNmXrtg",
   authDomain: "uchat-8310f.firebaseapp.com",
@@ -114,17 +145,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let me=null, currentChat=null;
-
-/* 🔥 AUTH STATE */
-onAuthStateChanged(auth,(user)=>{
-if(user){
-me = user.email;
-document.getElementById("login").style.display="none";
-document.getElementById("app").style.display="block";
-loadUsers();
-}
-});
+let me=null,currentChat=null;
 
 /* LOGIN */
 window.login = async ()=>{
@@ -138,33 +159,47 @@ return;
 
 try{
 await signInWithEmailAndPassword(auth,emailVal,passVal);
-}catch(err){
-try{
+}catch{
 await createUserWithEmailAndPassword(auth,emailVal,passVal);
-}catch(e){
-alert(e.message);
 }
-}
+
+me = auth.currentUser.email;
+
+/* SAVE USER */
+await setDoc(doc(db,"users",me),{
+email:me,
+online:true,
+lastSeen:Date.now()
+});
+
+login.style.display="none";
+app.style.display="block";
+
+loadUsers();
 };
 
-/* USERS */
+/* LOAD USERS */
 function loadUsers(){
-onSnapshot(collection(db,"users"),snap=>{
+onSnapshot(collection(db,"users"),snapshot=>{
 users.innerHTML="";
-snap.forEach(u=>{
-if(u.id===me) return;
+
+snapshot.forEach(docSnap=>{
+let data = docSnap.data();
+if(data.email===me) return;
 
 let div=document.createElement("div");
 div.className="chat-item";
-div.innerText=u.id;
-div.onclick=()=>openChat(u.id);
+
+div.innerHTML=`
+<b>${data.email}</b><br>
+<small>${data.online?"online":"offline"}</small>
+`;
+
+div.onclick=()=>openChat(data.email);
 
 users.appendChild(div);
 });
 });
-
-/* ensure user exists */
-setDoc(doc(db,"users",me),{online:true});
 }
 
 /* OPEN CHAT */
@@ -177,8 +212,8 @@ const q=query(collection(db,"messages"),orderBy("time"));
 onSnapshot(q,snap=>{
 messages.innerHTML="";
 
-snap.forEach(doc=>{
-let m=doc.data();
+snap.forEach(async docSnap=>{
+let m=docSnap.data();
 
 if(
 (m.from===me && m.to===user) ||
@@ -189,12 +224,25 @@ div.className="msg "+(m.from===me?"sent":"received");
 
 let content=m.text||"";
 
+if(m.image){
+content+=`<br><img src="${m.image}" width="150">`;
+}
 if(m.audio){
 content+=`<br><audio controls src="${m.audio}"></audio>`;
 }
 
-div.innerHTML=content;
+div.innerHTML=content+`
+<div class="meta">
+${new Date(m.time).toLocaleTimeString()}
+${m.from===me ? (m.seen?" ✔✔":" ✔"):""}
+</div>`;
+
 messages.appendChild(div);
+
+/* seen */
+if(m.to===me && !m.seen){
+await updateDoc(doc(db,"messages",docSnap.id),{seen:true});
+}
 }
 });
 
@@ -204,20 +252,34 @@ messages.scrollTop=messages.scrollHeight;
 
 /* SEND */
 window.send = async ()=>{
-if(!currentChat || !msg.value) return;
+if(!currentChat) return;
 
-await addDoc(collection(db,"messages"),{
-text:msg.value,
+let text = msg.value;
+let file = fileInput.files[0];
+
+let data = {
 from:me,
 to:currentChat,
-time:Date.now()
-});
-
-msg.value="";
+time:Date.now(),
+seen:false
 };
 
-/* 🎤 VOICE */
-let recorder, chunks=[], recording=false;
+if(text) data.text=text;
+
+if(file){
+let r = ref(storage,"files/"+Date.now());
+await uploadBytes(r,file);
+data.image = await getDownloadURL(r);
+}
+
+await addDoc(collection(db,"messages"),data);
+
+msg.value="";
+fileInput.value="";
+};
+
+/* VOICE */
+let recorder,chunks=[],recording=false;
 
 recordBtn.onclick = async ()=>{
 if(!currentChat) return;
@@ -241,7 +303,8 @@ await addDoc(collection(db,"messages"),{
 from:me,
 to:currentChat,
 audio:url,
-time:Date.now()
+time:Date.now(),
+seen:false
 });
 };
 
@@ -255,6 +318,30 @@ recordBtn.innerText="🎤";
 recording=false;
 }
 };
+
+/* TYPING */
+msg.oninput=()=>{
+if(!currentChat) return;
+
+setDoc(doc(db,"typing",me),{
+to:currentChat,typing:true
+});
+
+setTimeout(()=>{
+setDoc(doc(db,"typing",me),{typing:false});
+},1000);
+};
+
+onSnapshot(collection(db,"typing"),snap=>{
+let txt="";
+snap.forEach(t=>{
+let d=t.data();
+if(t.id===currentChat && d.typing){
+txt="typing...";
+}
+});
+typing.innerText=txt;
+});
 </script>
 
 </body>
