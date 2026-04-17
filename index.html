@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UChat Final</title>
+<title>UChat Pro</title>
 
 <style>
 :root{
@@ -13,77 +13,150 @@
 --green:#00a884;
 --text:#e9edef;
 --sub:#8696a0;
+--border:#1f2c33;
 }
 
-*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
+
 body{background:var(--bg);color:var(--text);height:100vh}
 
 /* LOGIN */
 #login{
-display:flex;flex-direction:column;
-justify-content:center;align-items:center;
-height:100vh;gap:10px;
+height:100vh;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+gap:12px;
 }
+#login h1{margin-bottom:10px}
 #login input{
-padding:12px;width:260px;border:none;border-radius:6px;
+width:280px;
+padding:12px;
+border:none;
+border-radius:8px;
+background:#1c2730;
+color:white;
 }
 #login button{
-padding:12px;width:260px;background:var(--green);
-border:none;color:white;cursor:pointer;
+width:280px;
+padding:12px;
+border:none;
+border-radius:8px;
+background:var(--green);
+color:white;
+cursor:pointer;
+font-weight:bold;
 }
 
-/* APP */
-#app{display:none;height:100vh}
+/* APP LAYOUT */
+#app{
+display:none;
+height:100vh;
+}
 
 /* SIDEBAR */
 .sidebar{
-width:30%;height:100%;
+width:30%;
+height:100%;
+float:left;
 background:var(--panel);
-float:left;overflow:auto;
-border-right:1px solid #1f2c33;
+border-right:1px solid var(--border);
+overflow:auto;
 }
-.chat-item{
-padding:12px;border-bottom:1px solid #1f2c33;
+
+.user{
+padding:12px;
+border-bottom:1px solid var(--border);
 cursor:pointer;
+transition:.2s;
 }
-.chat-item:hover{background:var(--chat)}
-.chat-item small{color:var(--sub)}
+.user:hover{background:var(--chat)}
+.user small{color:var(--sub)}
 
 /* CHAT */
 .chat{
-width:70%;height:100%;
+width:70%;
+height:100%;
 float:left;
-display:flex;flex-direction:column;
+display:flex;
+flex-direction:column;
 }
+
 .header{
-padding:12px;background:var(--panel);
-border-bottom:1px solid #1f2c33;
+padding:12px;
+background:var(--panel);
+border-bottom:1px solid var(--border);
+font-weight:bold;
 }
+
 .messages{
-flex:1;overflow:auto;padding:10px;
-display:flex;flex-direction:column;
+flex:1;
+padding:10px;
+overflow:auto;
+display:flex;
+flex-direction:column;
+gap:8px;
 }
+
 .msg{
-padding:10px;margin:5px;
-border-radius:8px;max-width:70%;
+max-width:70%;
+padding:10px;
+border-radius:10px;
+font-size:14px;
 }
-.sent{align-self:flex-end;background:var(--green);color:black}
-.received{align-self:flex-start;background:var(--chat)}
-.meta{font-size:10px;margin-top:5px;text-align:right}
+
+.sent{
+align-self:flex-end;
+background:var(--green);
+color:black;
+}
+
+.received{
+align-self:flex-start;
+background:var(--chat);
+}
+
+.meta{
+font-size:10px;
+margin-top:4px;
+text-align:right;
+color:#111;
+opacity:.7;
+}
 
 /* INPUT */
 .input{
-display:flex;padding:10px;background:var(--panel);gap:5px
-}
-.input input[type=text]{
-flex:1;padding:10px;border:none;border-radius:20px
-}
-.input button{
-padding:10px;border:none;background:var(--green);
-color:white;border-radius:50%;cursor:pointer;
+display:flex;
+gap:6px;
+padding:10px;
+background:var(--panel);
+border-top:1px solid var(--border);
 }
 
-#typing{font-size:12px;color:var(--sub);padding-left:10px}
+.input input[type=text]{
+flex:1;
+padding:10px;
+border-radius:20px;
+border:none;
+background:#1c2730;
+color:white;
+}
+
+.input button{
+padding:10px 14px;
+border:none;
+border-radius:50%;
+background:var(--green);
+cursor:pointer;
+color:white;
+}
+
+#typing{
+font-size:12px;
+padding-left:10px;
+color:var(--sub);
+}
 </style>
 </head>
 
@@ -91,7 +164,7 @@ color:white;border-radius:50%;cursor:pointer;
 
 <!-- LOGIN -->
 <div id="login">
-<h2>UChat</h2>
+<h1>UChat Pro</h1>
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="handleLogin()">Login / Register</button>
@@ -99,35 +172,50 @@ color:white;border-radius:50%;cursor:pointer;
 
 <!-- APP -->
 <div id="app">
+
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
-<div class="header" id="chatHeader">Select a user</div>
+<div class="header" id="chatHeader">Select a chat</div>
 <div id="typing"></div>
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input type="text" id="msg" placeholder="Type a message">
-<input type="file" id="fileInput">
+<input type="text" id="msg" placeholder="Message...">
+<input type="file" id="file">
 <button onclick="send()">➤</button>
 <button id="recordBtn">🎤</button>
 </div>
 </div>
+
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged
+getAuth,
+signInWithEmailAndPassword,
+createUserWithEmailAndPassword,
+onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 import {
-getFirestore, collection, addDoc, onSnapshot, query, orderBy,
-doc, setDoc, updateDoc
+getFirestore,
+collection,
+addDoc,
+onSnapshot,
+query,
+orderBy,
+doc,
+setDoc,
+updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 import {
-getStorage, ref, uploadBytes, getDownloadURL
+getStorage,
+ref,
+uploadBytes,
+getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 /* FIREBASE */
@@ -150,46 +238,47 @@ const loginDiv = document.getElementById("login");
 const appDiv = document.getElementById("app");
 const usersDiv = document.getElementById("users");
 const msg = document.getElementById("msg");
-const fileInput = document.getElementById("fileInput");
+const file = document.getElementById("file");
 const messages = document.getElementById("messages");
 const chatHeader = document.getElementById("chatHeader");
-const typing = document.getElementById("typing");
 
 let me = null;
 let currentChat = null;
 
 /* LOGIN */
 window.handleLogin = async () => {
-let emailVal = document.getElementById("email").value.trim();
-let passVal = document.getElementById("password").value.trim();
+try {
+const email = document.getElementById("email").value;
+const pass = document.getElementById("password").value;
 
-if(!emailVal || !passVal){
-alert("Enter email & password");
-return;
+try {
+await signInWithEmailAndPassword(auth, email, pass);
+} catch {
+await createUserWithEmailAndPassword(auth, email, pass);
 }
-
-try{
-await signInWithEmailAndPassword(auth,emailVal,passVal);
-}catch{
-await createUserWithEmailAndPassword(auth,emailVal,passVal);
+} catch (e) {
+alert(e.message);
 }
 };
 
-/* AUTH STATE */
-onAuthStateChanged(auth, async (user)=>{
-if(user){
+/* AUTH STATE (FIXED) */
+onAuthStateChanged(auth, async (user) => {
+if (user) {
 me = user.email;
 
 await setDoc(doc(db,"users",me),{
 email:me,
 online:true,
 lastSeen:Date.now()
-});
+},{merge:true});
 
 loginDiv.style.display="none";
 appDiv.style.display="block";
 
 loadUsers();
+} else {
+loginDiv.style.display="flex";
+appDiv.style.display="none";
 }
 });
 
@@ -203,7 +292,7 @@ let d=u.data();
 if(d.email===me) return;
 
 let div=document.createElement("div");
-div.className="chat-item";
+div.className="user";
 div.innerHTML=`<b>${d.email}</b><br><small>${d.online?"online":"offline"}</small>`;
 div.onclick=()=>openChat(d.email);
 usersDiv.appendChild(div);
@@ -211,7 +300,7 @@ usersDiv.appendChild(div);
 });
 }
 
-/* CHAT */
+/* OPEN CHAT */
 function openChat(user){
 currentChat=user;
 chatHeader.innerText=user;
@@ -222,24 +311,24 @@ onSnapshot(q,snap=>{
 messages.innerHTML="";
 
 snap.forEach(async m=>{
-let data=m.data();
+let d=m.data();
 
-if((data.from===me && data.to===user)||(data.from===user && data.to===me)){
+if((d.from===me&&d.to===user)||(d.from===user&&d.to===me)){
 
 let div=document.createElement("div");
-div.className="msg "+(data.from===me?"sent":"received");
+div.className="msg "+(d.from===me?"sent":"received");
 
-let content=data.text||"";
-if(data.image) content+=`<br><img src="${data.image}" width="150">`;
-if(data.audio) content+=`<br><audio controls src="${data.audio}"></audio>`;
+let content=d.text||"";
+if(d.image) content+=`<br><img src="${d.image}" width="160">`;
+if(d.audio) content+=`<br><audio controls src="${d.audio}"></audio>`;
 
 div.innerHTML=content+`
-<div class="meta">${new Date(data.time).toLocaleTimeString()}</div>
+<div class="meta">${new Date(d.time).toLocaleTimeString()}</div>
 `;
 
 messages.appendChild(div);
 
-if(data.to===me && !data.seen){
+if(d.to===me && !d.seen){
 await updateDoc(doc(db,"messages",m.id),{seen:true});
 }
 }
@@ -250,11 +339,11 @@ messages.scrollTop=messages.scrollHeight;
 }
 
 /* SEND */
-window.send = async ()=>{
+window.send = async () => {
 if(!currentChat) return;
 
 let text = msg.value;
-let file = fileInput.files[0];
+let f = file.files[0];
 
 let data = {
 from:me,
@@ -265,16 +354,16 @@ seen:false
 
 if(text) data.text=text;
 
-if(file){
+if(f){
 let r = ref(storage,"files/"+Date.now());
-await uploadBytes(r,file);
+await uploadBytes(r,f);
 data.image = await getDownloadURL(r);
 }
 
 await addDoc(collection(db,"messages"),data);
 
 msg.value="";
-fileInput.value="";
+file.value="";
 };
 </script>
 
