@@ -3,138 +3,106 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UChat Pro</title>
+<title>UChat Pro Max</title>
 
 <style>
-:root{
---bg:#0b141a;
---panel:#111b21;
---chat:#202c33;
---green:#00a884;
---text:#e9edef;
---sub:#8696a0;
---border:#1f2c33;
+body{
+margin:0;
+font-family:system-ui;
+background:#0b141a;
+color:#e9edef;
 }
 
-*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
-
-body{background:var(--bg);color:var(--text);height:100vh}
-
-/* LOGIN */
 #login{
 height:100vh;
 display:flex;
 flex-direction:column;
 justify-content:center;
 align-items:center;
-gap:12px;
+gap:10px;
 }
-#login h1{margin-bottom:10px}
+
 #login input{
-width:280px;
+width:260px;
 padding:12px;
 border:none;
 border-radius:8px;
 background:#1c2730;
 color:white;
 }
+
 #login button{
-width:280px;
+width:260px;
 padding:12px;
 border:none;
 border-radius:8px;
-background:var(--green);
+background:#00a884;
 color:white;
-cursor:pointer;
 font-weight:bold;
+cursor:pointer;
 }
 
-/* APP LAYOUT */
 #app{
 display:none;
 height:100vh;
 }
 
-/* SIDEBAR */
 .sidebar{
 width:30%;
-height:100%;
 float:left;
-background:var(--panel);
-border-right:1px solid var(--border);
+height:100%;
+background:#111b21;
 overflow:auto;
+border-right:1px solid #1f2c33;
 }
 
 .user{
 padding:12px;
-border-bottom:1px solid var(--border);
+border-bottom:1px solid #1f2c33;
 cursor:pointer;
-transition:.2s;
 }
-.user:hover{background:var(--chat)}
-.user small{color:var(--sub)}
+.user:hover{background:#202c33}
 
-/* CHAT */
 .chat{
 width:70%;
-height:100%;
 float:left;
+height:100%;
 display:flex;
 flex-direction:column;
 }
 
 .header{
 padding:12px;
-background:var(--panel);
-border-bottom:1px solid var(--border);
-font-weight:bold;
+background:#111b21;
+border-bottom:1px solid #1f2c33;
 }
 
 .messages{
 flex:1;
-padding:10px;
 overflow:auto;
+padding:10px;
 display:flex;
 flex-direction:column;
 gap:8px;
 }
 
 .msg{
-max-width:70%;
 padding:10px;
 border-radius:10px;
-font-size:14px;
+max-width:70%;
 }
 
-.sent{
-align-self:flex-end;
-background:var(--green);
-color:black;
-}
+.sent{align-self:flex-end;background:#00a884;color:black}
+.received{align-self:flex-start;background:#202c33}
 
-.received{
-align-self:flex-start;
-background:var(--chat);
-}
-
-.meta{
-font-size:10px;
-margin-top:4px;
-text-align:right;
-color:#111;
-opacity:.7;
-}
-
-/* INPUT */
 .input{
 display:flex;
-gap:6px;
 padding:10px;
-background:var(--panel);
-border-top:1px solid var(--border);
+gap:6px;
+background:#111b21;
 }
 
-.input input[type=text]{
+.input input{
 flex:1;
 padding:10px;
 border-radius:20px;
@@ -145,17 +113,10 @@ color:white;
 
 .input button{
 padding:10px 14px;
-border:none;
 border-radius:50%;
-background:var(--green);
+border:none;
+background:#00a884;
 cursor:pointer;
-color:white;
-}
-
-#typing{
-font-size:12px;
-padding-left:10px;
-color:var(--sub);
 }
 </style>
 </head>
@@ -164,7 +125,7 @@ color:var(--sub);
 
 <!-- LOGIN -->
 <div id="login">
-<h1>UChat Pro</h1>
+<h2>UChat</h2>
 <input id="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="handleLogin()">Login / Register</button>
@@ -176,15 +137,13 @@ color:var(--sub);
 <div class="sidebar" id="users"></div>
 
 <div class="chat">
-<div class="header" id="chatHeader">Select a chat</div>
-<div id="typing"></div>
+<div class="header" id="chatHeader">Select user</div>
 <div class="messages" id="messages"></div>
 
 <div class="input">
-<input type="text" id="msg" placeholder="Message...">
+<input id="msg" placeholder="Message...">
 <input type="file" id="file">
 <button onclick="send()">➤</button>
-<button id="recordBtn">🎤</button>
 </div>
 </div>
 
@@ -233,13 +192,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* DOM */
+/* UI */
 const loginDiv = document.getElementById("login");
 const appDiv = document.getElementById("app");
+
 const usersDiv = document.getElementById("users");
-const msg = document.getElementById("msg");
-const file = document.getElementById("file");
-const messages = document.getElementById("messages");
+const messagesDiv = document.getElementById("messages");
 const chatHeader = document.getElementById("chatHeader");
 
 let me = null;
@@ -247,7 +205,6 @@ let currentChat = null;
 
 /* LOGIN */
 window.handleLogin = async () => {
-try {
 const email = document.getElementById("email").value;
 const pass = document.getElementById("password").value;
 
@@ -256,26 +213,26 @@ await signInWithEmailAndPassword(auth, email, pass);
 } catch {
 await createUserWithEmailAndPassword(auth, email, pass);
 }
-} catch (e) {
-alert(e.message);
-}
 };
 
-/* AUTH STATE (FIXED) */
+/* AUTH STATE (MOST IMPORTANT FIX) */
 onAuthStateChanged(auth, async (user) => {
 if (user) {
 me = user.email;
 
+/* save user */
 await setDoc(doc(db,"users",me),{
 email:me,
 online:true,
-lastSeen:Date.now()
+time:Date.now()
 },{merge:true});
 
+/* SWITCH UI */
 loginDiv.style.display="none";
 appDiv.style.display="block";
 
 loadUsers();
+
 } else {
 loginDiv.style.display="flex";
 appDiv.style.display="none";
@@ -293,14 +250,15 @@ if(d.email===me) return;
 
 let div=document.createElement("div");
 div.className="user";
-div.innerHTML=`<b>${d.email}</b><br><small>${d.online?"online":"offline"}</small>`;
+div.innerHTML=d.email;
+
 div.onclick=()=>openChat(d.email);
 usersDiv.appendChild(div);
 });
 });
 }
 
-/* OPEN CHAT */
+/* CHAT */
 function openChat(user){
 currentChat=user;
 chatHeader.innerText=user;
@@ -308,33 +266,25 @@ chatHeader.innerText=user;
 const q=query(collection(db,"messages"),orderBy("time"));
 
 onSnapshot(q,snap=>{
-messages.innerHTML="";
+messagesDiv.innerHTML="";
 
 snap.forEach(async m=>{
 let d=m.data();
 
-if((d.from===me&&d.to===user)||(d.from===user&&d.to===me)){
+if((d.from===me && d.to===user)||(d.from===user && d.to===me)){
 
 let div=document.createElement("div");
 div.className="msg "+(d.from===me?"sent":"received");
 
 let content=d.text||"";
-if(d.image) content+=`<br><img src="${d.image}" width="160">`;
-if(d.audio) content+=`<br><audio controls src="${d.audio}"></audio>`;
+if(d.image) content+=`<br><img src="${d.image}" width="150">`;
 
-div.innerHTML=content+`
-<div class="meta">${new Date(d.time).toLocaleTimeString()}</div>
-`;
-
-messages.appendChild(div);
-
-if(d.to===me && !d.seen){
-await updateDoc(doc(db,"messages",m.id),{seen:true});
-}
+div.innerHTML=content;
+messagesDiv.appendChild(div);
 }
 });
 
-messages.scrollTop=messages.scrollHeight;
+messagesDiv.scrollTop=messagesDiv.scrollHeight;
 });
 }
 
@@ -342,28 +292,27 @@ messages.scrollTop=messages.scrollHeight;
 window.send = async () => {
 if(!currentChat) return;
 
-let text = msg.value;
-let f = file.files[0];
+let text = document.getElementById("msg").value;
+let file = document.getElementById("file").files[0];
 
 let data = {
 from:me,
 to:currentChat,
-time:Date.now(),
-seen:false
+time:Date.now()
 };
 
 if(text) data.text=text;
 
-if(f){
+if(file){
 let r = ref(storage,"files/"+Date.now());
-await uploadBytes(r,f);
+await uploadBytes(r,file);
 data.image = await getDownloadURL(r);
 }
 
 await addDoc(collection(db,"messages"),data);
 
-msg.value="";
-file.value="";
+document.getElementById("msg").value="";
+document.getElementById("file").value="";
 };
 </script>
 
